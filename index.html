@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Garden on the Grave — WAUHAUS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=DM+Mono:wght@300;400&display=swap');
+
+  :root {
+    --bg: #0c0c0a;
+    --fg: #c8c2b4;
+    --fg-dim: #5e5a50;
+    --earth: #3a4a28;
+    --earth-light: #6b7d4e;
+    --soil: #2a2118;
+    --bone: #d4c9a8;
+    --serif: 'EB Garamond', Georgia, serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--serif);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .fullscreen {
+    position: fixed;
+    inset: 0;
+  }
+
+  .artwork {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center top;
+    display: block;
+  }
+
+  .artwork::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(to bottom, transparent 40%, rgba(10,10,8,0.5) 55%, rgba(10,10,8,0.88) 75%, rgba(10,10,8,0.95) 100%);
+    pointer-events: none;
+  }
+
+  .controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    padding: 0 1.4rem 3.5rem;
+  }
+
+  .title-block {
+    padding-bottom: 0.8rem;
+  }
+
+  .title-block h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.2rem;
+    letter-spacing: 0.05em;
+    color: var(--fg);
+    text-transform: lowercase;
+  }
+
+  .title-block .credit {
+    font-family: var(--mono);
+    font-weight: 300;
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+    margin-top: 0.15rem;
+  }
+
+  .progress-wrap {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    cursor: pointer;
+    border-radius: 1px;
+    position: relative;
+    touch-action: none;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--earth), var(--earth-light));
+    width: 0%;
+    border-radius: 1px;
+    position: relative;
+    transition: width 0.25s linear;
+  }
+
+  .progress-thumb {
+    position: absolute;
+    right: -5px; top: -4px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--bone);
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  }
+
+  .progress-wrap:hover .progress-thumb,
+  .progress-wrap:active .progress-thumb,
+  .progress-wrap.touching .progress-thumb {
+    opacity: 1;
+  }
+
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: rgba(200,194,180,0.5);
+    margin-top: 0.4rem;
+    letter-spacing: 0.04em;
+  }
+
+  .play-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 0 0.2rem;
+  }
+
+  .play-btn {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(200,194,180,0.3);
+    background: rgba(12,12,10,0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    -webkit-appearance: none;
+  }
+
+  .play-btn:active { transform: scale(0.93); }
+
+  .play-btn.playing {
+    border-color: var(--earth-light);
+    box-shadow: 0 0 20px rgba(107,125,78,0.2);
+  }
+
+  .play-btn svg { width: 22px; height: 22px; fill: var(--fg); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--mono);
+    font-size: 0.5rem;
+    color: var(--fg-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+    transition: background 0.3s;
+  }
+
+  .status-dot.on { background: var(--earth-light); }
+
+  .lang-row {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .lang-btn {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    background: rgba(12,12,10,0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--fg-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-appearance: none;
+  }
+
+  .lang-btn.active {
+    color: var(--bone);
+    border-color: var(--earth);
+    background: rgba(58,74,40,0.3);
+  }
+
+  .lock-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg);
+  }
+
+  .lock-screen h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.6rem;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+    margin-bottom: 0.8rem;
+  }
+
+  .lock-screen .next {
+    font-family: var(--mono);
+    font-weight: 300;
+    font-size: 0.7rem;
+    color: var(--fg-dim);
+    letter-spacing: 0.06em;
+    line-height: 1.7;
+  }
+
+  .lock-screen .next span { color: var(--earth-light); }
+
+  .hidden { display: none !important; }
+
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .controls { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+
+<div class="fullscreen">
+
+  <div class="lock-screen hidden" id="lockScreen">
+    <h1>garden on the grave</h1>
+    <p class="next">next broadcast<br><span id="nextTime"></span></p>
+  </div>
+
+  <div class="artwork">
+    <img src="cover.jpg" alt="Garden on the Grave">
+  </div>
+
+  <div class="controls">
+    <div class="title-block">
+      <h1>garden on the grave</h1>
+      <div class="credit">wauhaus</div>
+    </div>
+
+    <div class="progress-wrap" id="pw">
+      <div class="progress-fill" id="pf"><div class="progress-thumb"></div></div>
+    </div>
+    <div class="time-row">
+      <span id="tC">0:00</span>
+      <span id="tD">0:00</span>
+    </div>
+
+    <div class="play-row">
+      <button class="play-btn" id="pb" aria-label="Play">
+        <svg id="iP" viewBox="0 0 24 24"><polygon points="7,3 21,12 7,21"/></svg>
+        <svg id="iS" class="hidden" viewBox="0 0 24 24"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+      </button>
+
+      <div class="lang-row" id="lr"></div>
+
+      <div class="status">
+        <div class="status-dot" id="sd"></div>
+        <span id="st">ready</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — update URLs and broadcasts when audio is ready
+// ============================================================
+const CONFIG = {
+  languages: {
+    'EN': [
+      'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio.mp3',
+      'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio.mp3',
+    ],
+    // 'LV': [
+    //   'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio-lv.mp3',
+    //   'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio-lv.mp3',
+    // ],
+    // 'FI': [
+    //   'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio.mp3',
+    //   'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio.mp3',
+    // ],
+  },
+  defaultLang: 'EN',
+
+  // Set to array of { start: 'ISO datetime' } for scheduled sync mode.
+  // All listeners will hear the same moment in the audio.
+  // Set to null for on-demand (no sync, no schedule).
+  broadcasts: null,
+
+  // Update this to match the final audio duration in seconds.
+  // Used as fallback before audio metadata loads.
+  durationFallback: 3812,
+};
+
+// ============================================================
+const $ = id => document.getElementById(id);
+let audios = {}, lang = CONFIG.defaultLang, on = false, drag = false;
+let activeBroadcast = null;
+let sourceIndex = {};
+
+// Lang buttons
+const keys = Object.keys(CONFIG.languages);
+if (keys.length > 1) keys.forEach(l => {
+  const b = document.createElement('button');
+  b.className = 'lang-btn' + (l === lang ? ' active' : '');
+  b.textContent = l; b.dataset.l = l;
+  b.onclick = () => langSwitch(l);
+  $('lr').appendChild(b);
+});
+else $('lr').style.display = 'none';
+
+// FIX #6: set preload correctly from the start, not overridden after
+function makeAudio(l, url) {
+  const a = new Audio();
+  a.preload = (l === lang) ? 'auto' : 'none';
+  a.src = url;
+  a.addEventListener('loadedmetadata', () => {
+    if (Math.abs(a.duration - CONFIG.durationFallback) > 2) {
+      console.warn('Duration mismatch: audio is ' + Math.round(a.duration) + 's, durationFallback is ' + CONFIG.durationFallback + 's — update CONFIG.');
+    }
+  });
+  a.addEventListener('ended', () => {
+    pa('transmission complete'); $('pf').style.width = '100%';
+  });
+  a.addEventListener('error', () => {
+    if (!tryFallback(l)) {
+      $('st').textContent = 'error loading';
+      $('sd').classList.remove('on');
+    }
+  });
+  return a;
+}
+
+Object.entries(CONFIG.languages).forEach(([l, urls]) => {
+  sourceIndex[l] = 0;
+  audios[l] = makeAudio(l, Array.isArray(urls) ? urls[0] : urls);
+});
+
+function tryFallback(l) {
+  const urls = CONFIG.languages[l];
+  if (!Array.isArray(urls)) return false;
+  const next = sourceIndex[l] + 1;
+  if (next >= urls.length) return false;
+  sourceIndex[l] = next;
+  const wasPlaying = on;
+  const pos = activeBroadcast ? getTargetTime() : audios[l].currentTime;
+  // FIX #4: clean up old audio element to prevent memory leak
+  audios[l].pause();
+  audios[l].src = '';
+  audios[l].load();
+  audios[l] = makeAudio(l, urls[next]);
+  $('st').textContent = 'reconnecting';
+  audios[l].addEventListener('canplay', function handler() {
+    audios[l].removeEventListener('canplay', handler);
+    audios[l].currentTime = activeBroadcast ? getTargetTime() : pos;
+    if (wasPlaying) {
+      audios[l].play().then(() => {
+        on = true;
+        $('pb').classList.add('playing');
+        $('iP').classList.add('hidden');
+        $('iS').classList.remove('hidden');
+        $('sd').classList.add('on');
+        $('st').textContent = activeBroadcast ? 'live' : 'playing';
+        cacheAudio(); // FIX #5: cache the fallback source too
+      }).catch(() => {});
+    } else {
+      $('st').textContent = 'ready';
+    }
+  }, { once: true });
+  return true;
+}
+
+const c = () => audios[lang];
+const dur = () =>
+  isFinite(c().duration) && c().duration > 0
+    ? c().duration
+    : CONFIG.durationFallback;
+
+$('pb').onclick = () => on ? pa() : pl();
+
+function getTargetTime() {
+  if (!activeBroadcast) return 0;
+  const elapsed = (Date.now() - activeBroadcast.start.getTime()) / 1000;
+  return Math.max(0, Math.min(elapsed, dur()));
+}
+
+function pl() {
+  const a = c();
+  if (activeBroadcast) {
+    const target = getTargetTime();
+    if (target >= dur()) { $('st').textContent = 'transmission complete'; return; }
+    a.currentTime = target;
+  }
+  a.play().then(() => {
+    on = true;
+    $('pb').classList.add('playing');
+    $('iP').classList.add('hidden');
+    $('iS').classList.remove('hidden');
+    $('sd').classList.add('on');
+    $('st').textContent = activeBroadcast ? 'live' : 'playing';
+    requestWake();
+    cacheAudio();
+  }).catch(() => {
+    $('st').textContent = 'tap to play';
+  });
+}
+
+function pa(status = 'paused') {
+  c().pause(); on = false;
+  $('pb').classList.remove('playing');
+  $('iP').classList.remove('hidden');
+  $('iS').classList.add('hidden');
+  $('sd').classList.remove('on');
+  $('st').textContent = status;
+  releaseWake();
+}
+
+// FIX A: safe currentTime assignment — waits for metadata if not yet loaded
+function setTimeSafe(audio, time) {
+  if (audio.readyState >= 1) {
+    audio.currentTime = time;
+  } else {
+    audio.addEventListener('loadedmetadata', function handler() {
+      audio.removeEventListener('loadedmetadata', handler);
+      audio.currentTime = time;
+    }, { once: true });
+  }
+}
+
+function langSwitch(l) {
+  if (l === lang) return;
+  const t = activeBroadcast ? getTargetTime() : c().currentTime;
+  const w = on;
+  c().pause(); lang = l;
+  if (audios[l].preload === 'none') {
+    audios[l].preload = 'auto';
+    audios[l].load(); // force iOS Safari to fetch metadata even when paused
+  }
+  setTimeSafe(c(), t);
+  // FIX #3: handle play rejection on slow networks
+  if (w) c().play().catch(() => {
+    on = false;
+    $('pb').classList.remove('playing');
+    $('iP').classList.remove('hidden');
+    $('iS').classList.add('hidden');
+    $('sd').classList.remove('on');
+    $('st').textContent = 'tap to play';
+  });
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.l === l));
+}
+
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = Math.floor(s%60);
+  return h > 0 ? h+':'+String(m).padStart(2,'0')+':'+String(sc).padStart(2,'0') : m+':'+String(sc).padStart(2,'0');
+}
+
+let lastSync = 0;
+let ticking = false;
+function tick() {
+  if (ticking) return;
+  ticking = true;
+  const loop = () => {
+    const a = c(), d = dur();
+    if (!document.hidden && d > 0 && !drag) {
+      $('pf').style.width = (a.currentTime / d * 100) + '%';
+      $('tC').textContent = fmt(a.currentTime);
+      $('tD').textContent = fmt(d);
+    }
+    if (on && activeBroadcast && Date.now() - lastSync > 15000) {
+      const target = getTargetTime();
+      if (Math.abs(a.currentTime - target) > 1.5) a.currentTime = target;
+      lastSync = Date.now();
+    }
+    if (document.hidden) {
+      setTimeout(loop, 1000);
+    } else {
+      requestAnimationFrame(loop);
+    }
+  };
+  loop();
+}
+tick();
+
+function sk(e) {
+  if (activeBroadcast) return;
+  const r = $('pw').getBoundingClientRect();
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const p = Math.max(0, Math.min(1, (x-r.left)/r.width));
+  const a = c();
+  if (a.duration) {
+    a.currentTime = p * a.duration;
+    Object.values(audios).forEach(el => { if (el !== a && el.readyState >= 1) el.currentTime = a.currentTime; }); // FIX B: skip unloaded audio elements
+    $('pf').style.width = (p*100)+'%';
+  }
+}
+
+$('pw').addEventListener('mousedown', e => { if (!activeBroadcast) drag=true; sk(e); }); // FIX C: don't set drag in broadcast mode
+$('pw').addEventListener('touchstart', e => { if (!activeBroadcast) { drag=true; $('pw').classList.add('touching'); } sk(e); }, {passive:true});
+document.addEventListener('mousemove', e => { if(drag) sk(e); });
+document.addEventListener('touchmove', e => { if(drag) sk(e); }, {passive:true});
+document.addEventListener('mouseup', () => { drag=false; });
+document.addEventListener('touchend', () => { drag=false; $('pw').classList.remove('touching'); });
+document.addEventListener('touchcancel', () => { drag=false; $('pw').classList.remove('touching'); });
+
+function chk() {
+  if (!CONFIG.broadcasts) { $('lockScreen').classList.add('hidden'); activeBroadcast = null; return; }
+  const now = new Date(), d = dur();
+  let found = null;
+  for (const b of CONFIG.broadcasts) {
+    const s = new Date(b.start), e = new Date(s.getTime() + d * 1000);
+    if (now >= s && now <= e) { found = { start: s, end: e }; break; }
+  }
+  if (found) { activeBroadcast = found; $('lockScreen').classList.add('hidden'); }
+  else {
+    activeBroadcast = null; $('lockScreen').classList.remove('hidden');
+    if (on) pa();
+    const future = CONFIG.broadcasts.map(b => new Date(b.start)).filter(s => s > now).sort((a,b) => a-b);
+    $('nextTime').textContent = future.length
+      ? future[0].toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' })
+      : 'no upcoming broadcasts';
+  }
+}
+if (CONFIG.broadcasts) {
+  chk();
+  setInterval(chk, 5000);
+}
+
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: 'Garden on the Grave', artist: 'WAUHAUS', album: 'Garden on the Grave',
+    artwork: [{ src: 'cover.jpg', sizes: '512x512', type: 'image/jpeg' }]
+  });
+  navigator.mediaSession.setActionHandler('play', pl);
+  navigator.mediaSession.setActionHandler('pause', pa);
+  navigator.mediaSession.setActionHandler('stop', pa);
+}
+
+// FIX #2: relative path works outside root too
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// FIX #1: use current active source URL, not always urls[0]
+function cacheAudio() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(reg => {
+    if (!reg.active) return;
+    const urls = CONFIG.languages[lang];
+    const currentUrl = Array.isArray(urls) ? urls[sourceIndex[lang]] : urls;
+    reg.active.postMessage({ type: 'CACHE_AUDIO', url: currentUrl });
+  });
+}
+
+let wakeLock = null;
+async function requestWake() {
+  try { if ('wakeLock' in navigator && on) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch(e) {}
+}
+function releaseWake() { if (wakeLock) { try { wakeLock.release(); } catch(e) {} wakeLock = null; } }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && on) {
+    requestWake();
+    if (activeBroadcast) {
+      const target = getTargetTime();
+      if (Math.abs(c().currentTime - target) > 1.5) c().currentTime = target;
+      lastSync = Date.now();
+    }
+  }
+});
+</script>
+</body>
+</html>

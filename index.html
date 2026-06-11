@@ -439,7 +439,6 @@ function pl() {
     $('iS').classList.remove('hidden');
     $('sd').classList.add('on');
     $('st').textContent = activeBroadcast ? 'live' : 'playing';
-    requestWake();
     cacheAudio();
   }).catch(() => {
     $('st').textContent = 'tap to play';
@@ -453,7 +452,6 @@ function pa(status = 'paused') {
   $('iS').classList.add('hidden');
   $('sd').classList.remove('on');
   $('st').textContent = status;
-  releaseWake();
 }
 
 // FIX A: safe currentTime assignment — waits for metadata if not yet loaded
@@ -593,19 +591,13 @@ function cacheAudio() {
   });
 }
 
-let wakeLock = null;
-async function requestWake() {
-  try { if ('wakeLock' in navigator && on) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch(e) {}
-}
-function releaseWake() { if (wakeLock) { try { wakeLock.release(); } catch(e) {} wakeLock = null; } }
+// Resync to broadcast time when screen wakes up — covers any drift
+// accumulated while JS was throttled in the background.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && on) {
-    requestWake();
-    if (activeBroadcast) {
-      const target = getTargetTime();
-      if (Math.abs(c().currentTime - target) > 1.5) c().currentTime = target;
-      lastSync = Date.now();
-    }
+  if (document.visibilityState === 'visible' && on && activeBroadcast) {
+    const target = getTargetTime();
+    if (Math.abs(c().currentTime - target) > 1.5) c().currentTime = target;
+    lastSync = Date.now();
   }
 });
 </script>

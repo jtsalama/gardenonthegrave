@@ -304,32 +304,37 @@
 
 <script>
 // ============================================================
-// CONFIG — update URLs and broadcasts when audio is ready
+// CONFIG — TEMPORARY TEST SETUP, revert before the show
+// Two entries labelled MP3 / AAC: the button label is the key itself,
+// so the language switcher doubles as an A/B codec comparison.
+// Both are the same Copenhagen master, so switching mid-playback
+// compares the same passage at the same moment.
 // ============================================================
 const CONFIG = {
   languages: {
-    'EN': [
+    'MP3': [
       'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio.mp3',
       'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio.mp3',
     ],
-    // 'LV': [
-    //   'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio-lv.mp3',
-    //   'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio-lv.mp3',
-    // ],
-    // 'FI': [
-    //   'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/audio.mp3',
-    //   'https://github.com/jtsalama/gardenonthegrave/releases/download/v1/audio.mp3',
-    // ],
+    'AAC': [
+      'https://pub-0f1058e036ee41378ed0676e2e2cf889.r2.dev/gotg-aac160.m4a',
+    ],
+    // For the show, replace both with:
+    // 'EN': ['<r2>/riga-en.m4a', '<github v2>/riga-en.m4a'],
+    // 'LV': ['<r2>/riga-lv.m4a', '<github v2>/riga-lv.m4a'],
   },
-  defaultLang: 'EN',
+  defaultLang: 'MP3',
 
-  // Set to array of { start: 'ISO datetime' } for scheduled sync mode.
-  // All listeners will hear the same moment in the audio.
-  // Set to null for on-demand (no sync, no schedule).
-  broadcasts: null,
+  // Scheduled sync test: Saturday 25 July 2026, 22:00 Helsinki (= Riga, UTC+03:00).
+  // Window runs 22:00:00 - 23:03:32 (start + durationFallback).
+  // Outside it the lock screen shows and playback is blocked.
+  // Set back to null for on-demand listening.
+  broadcasts: [
+    { start: '2026-07-25T22:00:00+03:00' },
+  ],
 
-  // Update this to match the final audio duration in seconds.
-  // Used as fallback before audio metadata loads.
+  // Total audio length in seconds, preroll included once there is one.
+  // Used before metadata loads, and to compute the end of a broadcast window.
   durationFallback: 3812,
 };
 

@@ -1,4 +1,4 @@
-const CACHE = 'gotg-v2';
+const CACHE = 'gotg-v3';
 
 self.addEventListener('install', e => {
   e.waitUntil(

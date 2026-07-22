@@ -360,6 +360,7 @@ else $('lr').style.display = 'none';
 function makeAudio(l, url) {
   const a = new Audio();
   a.preload = (l === lang) ? 'auto' : 'none';
+  a.disableRemotePlayback = true; // no Cast button, no nearby-devices/Bluetooth scan prompt
   a.src = url;
   a.addEventListener('loadedmetadata', () => {
     if (Math.abs(a.duration - CONFIG.durationFallback) > 2) {

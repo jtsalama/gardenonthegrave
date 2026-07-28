@@ -1,9 +1,11 @@
-const CACHE = 'gotg-v6';
+const CACHE = 'gotg-v7';
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(['./index.html', './cover.jpg'])) // FIX 1: relative paths
+      // './' as well as './index.html': the browser requests the root URL, and cache lookups
+      // are exact, so caching only index.html left the page unopenable offline.
+      .then(c => c.addAll(['./', './index.html', './cover.jpg']))
       .then(() => self.skipWaiting())
   );
 });
@@ -53,8 +55,10 @@ async function handleRangeFromCache(request) {
   const rangeHeader = request.headers.get('range');
   if (!rangeHeader) return cached;
 
-  const ab = await cached.arrayBuffer();
-  const total = ab.byteLength;
+  // Blob, not arrayBuffer: arrayBuffer pulled the whole file (150 MB) into RAM on every single
+  // range request, which killed playback on a phone within minutes. blob.slice() stays lazy.
+  const blob = await cached.blob();
+  const total = blob.size;
 
   // FIX 2: safe range parsing — handles malformed or unexpected range headers
   const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
@@ -69,7 +73,7 @@ async function handleRangeFromCache(request) {
     return new Response(null, { status: 416 });
   }
 
-  return new Response(ab.slice(safeStart, safeEnd + 1), {
+  return new Response(blob.slice(safeStart, safeEnd + 1), {
     status: 206,
     headers: {
       'Content-Range':  `bytes ${safeStart}-${safeEnd}/${total}`,
@@ -83,10 +87,13 @@ async function handleRangeFromCache(request) {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Same-origin assets (index.html, cover.jpg): cache first
+  // Same-origin assets (index.html, cover.jpg): cache first, and if the network is gone
+  // fall back to the cached page so a navigation still opens offline.
   if (url.origin === self.location.origin) {
     e.respondWith(
-      caches.match(e.request).then(hit => hit || fetch(e.request))
+      caches.match(e.request)
+        .then(hit => hit || fetch(e.request))
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }

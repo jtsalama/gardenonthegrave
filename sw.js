@@ -1,11 +1,13 @@
-const CACHE = 'gotg-v7';
+const CACHE = 'gotg-v8';
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      // './' as well as './index.html': the browser requests the root URL, and cache lookups
-      // are exact, so caching only index.html left the page unopenable offline.
-      .then(c => c.addAll(['./', './index.html', './cover.jpg']))
+      // Root only. The browser requests '/' for a navigation and cache lookups are exact, so
+      // caching just './index.html' left the page unopenable offline. './index.html' itself is
+      // deliberately NOT precached: the host answers it with a 308 to the root, and a redirected
+      // response would both risk failing the whole addAll and be refused for a navigation.
+      .then(c => c.addAll(['./', './cover.jpg']))
       .then(() => self.skipWaiting())
   );
 });
@@ -93,7 +95,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       caches.match(e.request)
         .then(hit => hit || fetch(e.request))
-        .catch(() => caches.match('./index.html'))
+        .catch(() => caches.match('./'))
     );
     return;
   }

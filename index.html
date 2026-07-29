@@ -443,9 +443,10 @@ function revived() {
 }
 
 // Start over from the primary source. Called on a timer, on 'online', and from the play button.
-function retry(force) {
+function retry() {
   if (!dead) return;
-  if (!force && !navigator.onLine) return;
+  // No navigator.onLine check: iOS reports it unreliably, and a refused retry leaves the
+  // listener in silence while a failed one costs nothing.
   switchSource(lang, 0);
 }
 
@@ -457,8 +458,25 @@ const dur = () =>
     ? c().duration
     : CONFIG.durationFallback;
 
+// iOS only lets an element play if the call comes straight out of a user gesture. Everything
+// that starts playback later — switching language once loaded, recovering when the network
+// returns — would be refused there. So on the very first tap, give every language a token
+// play/pause inside the gesture. After that the browser considers them unlocked and later
+// programmatic starts are allowed.
+let unlocked = false;
+function unlockAll() {
+  if (unlocked) return;
+  unlocked = true;
+  Object.values(audios).forEach(a => {
+    if (a === c()) return;                   // the active one is about to play for real
+    const p = a.play();
+    if (p && p.then) p.then(() => a.pause()).catch(() => {});
+  });
+}
+
 $('pb').onclick = () => {
-  if (dead) { retry(true); return; }   // force a reconnect even if the OS still claims offline
+  unlockAll();
+  if (dead) { retry(); return; }
   on ? pa() : pl();
 };
 
@@ -648,7 +666,7 @@ if ('mediaSession' in navigator) {
   });
   // Wrap the handlers: Media Session calls them with a details object, and pa()'s first
   // parameter is the status text, so passing it straight through corrupts the status line.
-  navigator.mediaSession.setActionHandler('play', () => { dead ? retry(true) : pl(); });
+  navigator.mediaSession.setActionHandler('play', () => { dead ? retry() : pl(); });
   navigator.mediaSession.setActionHandler('pause', () => pa());
   navigator.mediaSession.setActionHandler('stop', () => pa());
 

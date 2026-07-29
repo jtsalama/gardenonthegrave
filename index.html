@@ -513,21 +513,44 @@ function langSwitch(l) {
   const t = activeBroadcast ? getTargetTime() : c().currentTime;
   const w = on;
   c().pause(); lang = l;
-  if (audios[l].preload === 'none') {
-    audios[l].preload = 'auto';
-    audios[l].load(); // force iOS Safari to fetch metadata even when paused
-  }
-  setTimeSafe(c(), t);
-  // FIX #3: handle play rejection on slow networks
-  if (w) c().play().catch(() => {
-    on = false;
-    $('pb').classList.remove('playing');
-    $('iP').classList.remove('hidden');
-    $('iS').classList.add('hidden');
-    $('sd').classList.remove('on');
-    $('st').textContent = 'tap to play';
-  });
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.l === l));
+
+  const a = audios[l];
+  if (a.preload !== 'auto') {
+    a.preload = 'auto';
+    a.load(); // force iOS Safari to fetch metadata even when paused
+  }
+
+  // Seek and start only once the element can actually play. The old code called play()
+  // immediately after load(), on an element that had no data yet. Chrome tolerates that and
+  // waits; Firefox does not, which is why switching to a language that had never been loaded
+  // silently did nothing there. If the data never arrives, the starvation watch in tick()
+  // notices and hands it to the recovery path.
+  const begin = () => {
+    setTimeSafe(a, activeBroadcast ? getTargetTime() : t);
+    if (!w) { $('st').textContent = 'ready'; return; }
+    a.play().then(() => {
+      on = true;
+      $('pb').classList.add('playing');
+      $('iP').classList.add('hidden');
+      $('iS').classList.remove('hidden');
+      $('sd').classList.add('on');
+      $('st').textContent = activeBroadcast ? 'live' : 'playing';
+    }).catch(() => {
+      on = false;
+      $('pb').classList.remove('playing');
+      $('iP').classList.remove('hidden');
+      $('iS').classList.add('hidden');
+      $('sd').classList.remove('on');
+      $('st').textContent = 'tap to play';
+    });
+  };
+
+  if (a.readyState >= 3) begin();
+  else {
+    if (w) $('st').textContent = 'loading';
+    a.addEventListener('canplay', begin, { once: true });
+  }
 }
 
 function fmt(s) {
@@ -538,6 +561,7 @@ function fmt(s) {
 
 let lastSync = 0;
 let ticking = false;
+let starvedAt = 0;
 function tick() {
   if (ticking) return;
   ticking = true;
@@ -547,6 +571,16 @@ function tick() {
       $('pf').style.width = (a.currentTime / d * 100) + '%';
       $('tC').textContent = fmt(a.currentTime);
       $('tD').textContent = fmt(d);
+    }
+    // Notice playback that has quietly run out of data. Chrome raises 'error' when the network
+    // dies mid-stream, Firefox raises nothing at all and simply waits forever, so recovery
+    // never started there. Watching readyState works in both, and unlike watching currentTime
+    // it is not masked by the broadcast resync writing a new position onto a dead element.
+    if (on && !dead && a.readyState < 3) {
+      if (!starvedAt) starvedAt = Date.now();
+      else if (Date.now() - starvedAt > 10000) { starvedAt = 0; giveUp(); }
+    } else {
+      starvedAt = 0;
     }
     if (on && activeBroadcast && Date.now() - lastSync > 15000) {
       const target = getTargetTime();

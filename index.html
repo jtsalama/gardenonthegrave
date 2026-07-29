@@ -408,7 +408,6 @@ function switchSource(l, i) {
         $('iS').classList.remove('hidden');
         $('sd').classList.add('on');
         $('st').textContent = activeBroadcast ? 'live' : 'playing';
-        cacheAudio();
       }).catch(() => { $('st').textContent = 'tap to play'; });
     } else {
       $('st').textContent = 'ready';
@@ -483,7 +482,6 @@ function pl() {
     $('iS').classList.remove('hidden');
     $('sd').classList.add('on');
     $('st').textContent = activeBroadcast ? 'live' : 'playing';
-    cacheAudio();
   }).catch(() => {
     $('st').textContent = 'tap to play';
   });
@@ -646,16 +644,10 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
-// FIX #1: use current active source URL, not always urls[0]
-function cacheAudio() {
-  if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.ready.then(reg => {
-    if (!reg.active) return;
-    const urls = CONFIG.languages[lang];
-    const currentUrl = Array.isArray(urls) ? urls[sourceIndex[lang]] : urls;
-    reg.active.postMessage({ type: 'CACHE_AUDIO', url: currentUrl });
-  });
-}
+// No audio pre-caching. Downloading the whole file alongside the stream doubled every
+// listener's data, competed with the stream on exactly the weak connections it was meant to
+// protect, and only ever completed on a connection good enough not to need it. The media
+// element's own buffer plus automatic recovery covers real dropouts instead.
 
 // Resync to broadcast time when screen wakes up — covers any drift
 // accumulated while JS was throttled in the background.

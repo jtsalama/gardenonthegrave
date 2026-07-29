@@ -1,4 +1,11 @@
-const CACHE = 'gotg-v10';
+const CACHE = 'gotg-v11';
+
+// This worker only makes the page itself survive a bad connection. It deliberately does NOT
+// touch audio any more: pre-downloading the whole file alongside the stream doubled every
+// listener's data, competed with the stream on exactly the weak connections it was meant to
+// protect, kept nothing when a download was interrupted, and its 5 s timeout turned a slow
+// response into a hard error. Audio now goes straight to the network, and the player handles
+// dropouts with the media buffer plus its own recovery.
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -20,97 +27,19 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Called from main page when user presses play
-self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'CACHE_AUDIO') {
-    const { url } = e.data;
-    caches.open(CACHE).then(async cache => {
-      if (await cache.match(url)) return; // already cached
-      fetch(url, { mode: 'cors' })
-        .then(res => {
-          const type = res.headers.get('Content-Type') || '';
-          if (res.ok && type.includes('audio')) { // FIX 5: validate content-type
-            cache.put(url, res.clone());           // FIX 4: clone before putting
-          }
-        })
-        .catch(() => {});
-    });
-  }
-});
-
-// FIX 6: timeout wrapper — avoids long stalls on captive portals / weak wifi
-function fetchWithTimeout(request, timeout = 5000) {
-  return Promise.race([
-    fetch(request),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), timeout)
-    )
-  ]);
-}
-
-// Serve a range request from a fully cached file
-async function handleRangeFromCache(request) {
-  const cache = await caches.open(CACHE);
-  const cached = await cache.match(request.url);
-  if (!cached) return null;
-
-  const rangeHeader = request.headers.get('range');
-  if (!rangeHeader) return cached;
-
-  // Blob, not arrayBuffer: arrayBuffer pulled the whole file (150 MB) into RAM on every single
-  // range request, which killed playback on a phone within minutes. blob.slice() stays lazy.
-  const blob = await cached.blob();
-  const total = blob.size;
-
-  // FIX 2: safe range parsing — handles malformed or unexpected range headers
-  const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
-  if (!match) return cached;
-  const start = match[1] ? parseInt(match[1], 10) : 0;
-  const end   = match[2] ? parseInt(match[2], 10) : total - 1;
-
-  // FIX 3: clamp bounds — return 416 if range is invalid
-  const safeStart = Math.max(0, start);
-  const safeEnd   = Math.min(end, total - 1);
-  if (safeStart > safeEnd) {
-    return new Response(null, { status: 416 });
-  }
-
-  return new Response(blob.slice(safeStart, safeEnd + 1), {
-    status: 206,
-    headers: {
-      'Content-Range':  `bytes ${safeStart}-${safeEnd}/${total}`,
-      'Content-Length': String(safeEnd - safeStart + 1),
-      'Content-Type':   cached.headers.get('Content-Type') || 'audio/mpeg',
-      'Accept-Ranges':  'bytes',
-    }
-  });
-}
-
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Same-origin assets (index.html, cover.jpg): cache first, and if the network is gone
-  // fall back to the cached page so a navigation still opens offline.
-  if (url.origin === self.location.origin) {
-    e.respondWith(
-      // ignoreSearch/ignoreVary: a cache-busting query string or a Vary header on the host's
-      // response would otherwise miss the entry we precached and leave the page unopenable.
-      caches.match(e.request, { ignoreSearch: true, ignoreVary: true })
-        .then(hit => hit || fetch(e.request))
-        .catch(() => caches.match('./', { ignoreVary: true }))
-    );
-    return;
-  }
+  // Same-origin assets (the page, cover.jpg): cache first, and if the network is gone fall
+  // back to the cached page so a navigation still opens offline.
+  // Everything else, audio included, is left alone and goes straight to the network.
+  if (url.origin !== self.location.origin) return;
 
-  // Audio hosts: network first with timeout, fall back to cache
-  const isAudio = url.hostname.endsWith('r2.dev') ||
-                  url.hostname.includes('github.com') ||
-                  url.hostname.includes('githubusercontent.com');
-  if (isAudio) {
-    e.respondWith(
-      fetchWithTimeout(e.request).catch(() =>
-        handleRangeFromCache(e.request).then(r => r || Response.error())
-      )
-    );
-  }
+  e.respondWith(
+    // ignoreSearch/ignoreVary: a cache-busting query string or a Vary header on the host's
+    // response would otherwise miss the entry we precached and leave the page unopenable.
+    caches.match(e.request, { ignoreSearch: true, ignoreVary: true })
+      .then(hit => hit || fetch(e.request))
+      .catch(() => caches.match('./', { ignoreVary: true }))
+  );
 });

@@ -373,6 +373,7 @@ function makeAudio(l, url) {
   });
   a.addEventListener('error', () => {
     if (a !== audios[l]) return;      // stale element from an earlier source, ignore
+    if (l !== lang) return;           // a language nobody is listening to must not kill the UI
     if (!tryFallback(l)) giveUp();
   });
   return a;

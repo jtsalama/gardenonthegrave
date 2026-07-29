@@ -1,4 +1,4 @@
-const CACHE = 'gotg-v9';
+const CACHE = 'gotg-v10';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -93,9 +93,11 @@ self.addEventListener('fetch', e => {
   // fall back to the cached page so a navigation still opens offline.
   if (url.origin === self.location.origin) {
     e.respondWith(
-      caches.match(e.request)
+      // ignoreSearch/ignoreVary: a cache-busting query string or a Vary header on the host's
+      // response would otherwise miss the entry we precached and leave the page unopenable.
+      caches.match(e.request, { ignoreSearch: true, ignoreVary: true })
         .then(hit => hit || fetch(e.request))
-        .catch(() => caches.match('./'))
+        .catch(() => caches.match('./', { ignoreVary: true }))
     );
     return;
   }

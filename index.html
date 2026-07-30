@@ -391,7 +391,10 @@ function makeAudio(l, url) {
     }, a.dataset.started ? 10000 : 30000);
   });
   a.addEventListener('playing', () => {
-    a.dataset.started = '1';
+    // Only a track that has actually been heard counts as started. The silent unlock and the
+    // muted nudge both fire 'playing' too, and letting those count made the stall watch use
+    // its short deadline on a language that was in fact still loading for the first time.
+    if (!a.muted) a.dataset.started = '1';
     clearTimeout(waitTimer);
   });
   return a;
@@ -499,8 +502,11 @@ function unlockAll() {
     // use, but it buys more than speed: a switch no longer depends on a download succeeding
     // at the exact moment someone taps the button in the middle of a cemetery.
     a.preload = 'auto';
+    a.muted = true;                          // silent: this must never be audible
     const p = a.play();
-    if (p && p.then) p.then(() => a.pause()).catch(() => {});
+    // Re-check on resolve: if the listener switched to this language in the meantime, pausing
+    // here would stop the playback they just asked for.
+    if (p && p.then) p.then(() => { if (a !== c()) a.pause(); }).catch(() => {});
   });
 }
 
@@ -518,6 +524,7 @@ function getTargetTime() {
 
 function pl() {
   const a = c();
+  a.muted = false;   // an unlock or a nudge may have left it silent
   if (activeBroadcast) {
     const target = getTargetTime();
     if (target >= dur()) { $('st').textContent = 'transmission complete'; return; }

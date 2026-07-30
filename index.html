@@ -384,11 +384,16 @@ function makeAudio(l, url) {
   a.addEventListener('waiting', () => {
     if (a !== audios[l] || l !== lang || !on || dead) return;
     clearTimeout(waitTimer);
+    // An element that has never played is simply still loading, and Firefox is slow at it.
+    // Only give up quickly on something that was already running and then stopped.
     waitTimer = setTimeout(() => {
       if (a === audios[l] && l === lang && on && !dead) giveUp();
-    }, 10000);
+    }, a.dataset.started ? 10000 : 30000);
   });
-  a.addEventListener('playing', () => clearTimeout(waitTimer));
+  a.addEventListener('playing', () => {
+    a.dataset.started = '1';
+    clearTimeout(waitTimer);
+  });
   return a;
 }
 
@@ -413,6 +418,7 @@ function switchSource(l, i) {
     if (audios[l] !== this) return;                  // superseded while loading
     revived();
     setTimeSafe(this, activeBroadcast ? getTargetTime() : pos);
+    this.muted = false;
     if (wasPlaying) {
       this.play().then(() => {
         on = true;
@@ -426,6 +432,13 @@ function switchSource(l, i) {
       $('st').textContent = 'ready';
     }
   }, { once: true });
+  // Same nudge as in langSwitch: Firefox fetches nothing for an element it has not been told
+  // to play, so waiting for 'canplay' alone left recovery stuck on "reconnecting" forever.
+  if (wasPlaying) {
+    audios[l].muted = true;
+    const p = audios[l].play();
+    if (p && p.catch) p.catch(() => {});
+  }
 }
 
 function tryFallback(l) {
@@ -617,16 +630,9 @@ function tick() {
       $('tC').textContent = fmt(a.currentTime);
       $('tD').textContent = fmt(d);
     }
-    // Notice playback that has quietly run out of data. Chrome raises 'error' when the network
-    // dies mid-stream, Firefox raises nothing at all and simply waits forever, so recovery
-    // never started there. Watching readyState works in both, and unlike watching currentTime
-    // it is not masked by the broadcast resync writing a new position onto a dead element.
-    if (on && !dead && a.readyState < 3) {
-      if (!starvedAt) starvedAt = Date.now();
-      else if (Date.now() - starvedAt > 10000) { starvedAt = 0; giveUp(); }
-    } else {
-      starvedAt = 0;
-    }
+    // (Stall detection lives on the 'waiting' event in makeAudio. A readyState watch used to
+    // sit here as well, but it could not tell a first load from a dropout and declared the
+    // connection lost while a language was still perfectly normally loading.)
     if (on && activeBroadcast && Date.now() - lastSync > 15000) {
       const target = getTargetTime();
       if (Math.abs(a.currentTime - target) > 1.5) a.currentTime = target;

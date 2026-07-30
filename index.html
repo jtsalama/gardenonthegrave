@@ -391,11 +391,20 @@ function makeAudio(l, url) {
     }, a.dataset.started ? 10000 : 30000);
   });
   a.addEventListener('playing', () => {
-    // Only a track that has actually been heard counts as started. The unlock and the muted
-    // nudge both fire 'playing' too, and letting those count made the stall watch use its
-    // short deadline on a language that was in fact still loading for the first time.
-    if (!a.muted && !a.dataset.unlocking) a.dataset.started = '1';
     clearTimeout(waitTimer);
+    // The unlock also fires this, and it must not count as the track having been heard.
+    if (a.muted || a.dataset.unlocking) return;
+    a.dataset.started = '1';
+    // Let the interface follow what is actually happening rather than what we asked for.
+    // Whoever started this element — the gesture, a retry, the lock screen — the state is
+    // the same once sound is coming out, and this is the only moment we know that for sure.
+    if (a !== audios[lang]) return;
+    on = true;
+    $('pb').classList.add('playing');
+    $('iP').classList.add('hidden');
+    $('iS').classList.remove('hidden');
+    $('sd').classList.add('on');
+    $('st').textContent = activeBroadcast ? 'live' : 'playing';
   });
   return a;
 }
@@ -426,17 +435,13 @@ function switchSource(l, i, forcePos, statusText) {
     revived();
     setTimeSafe(this, activeBroadcast ? getTargetTime() : pos);
     this.muted = false;
-    if (wasPlaying) {
-      this.play().then(() => {
-        on = true;
-        $('pb').classList.add('playing');
-        $('iP').classList.add('hidden');
-        $('iS').classList.remove('hidden');
-        $('sd').classList.add('on');
-        $('st').textContent = activeBroadcast ? 'live' : 'playing';
-      }).catch(() => { $('st').textContent = 'tap to play'; });
-    } else {
-      $('st').textContent = 'ready';
+    if (!wasPlaying) { $('st').textContent = 'ready'; return; }
+    // Only ask again if the request made inside the gesture did not take. Asking twice on the
+    // same element makes the two calls abort each other, which is why the switch worked or
+    // hung depending on how fast the file arrived. The 'playing' handler updates the interface.
+    if (this.paused) {
+      const p = this.play();
+      if (p && p.catch) p.catch(() => { $('st').textContent = 'tap to play'; });
     }
   }, { once: true });
   // Ask to play right here, inside the gesture that triggered this. Autoplay rules mean the

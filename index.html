@@ -482,9 +482,9 @@ function unlockAll() {
   unlocked = true;
   Object.values(audios).forEach(a => {
     if (a === c()) return;                   // the active one is about to play for real
-    // Also start fetching. Until now the other language was left at preload 'none', so a
-    // switch began from nothing and the wait looked identical to a broken player. Once the
-    // listener has pressed play they are committed, so a head start is worth the bytes.
+    // Start fetching the other language too. This costs a few MB that most listeners never
+    // use, but it buys more than speed: a switch no longer depends on a download succeeding
+    // at the exact moment someone taps the button in the middle of a cemetery.
     a.preload = 'auto';
     const p = a.play();
     if (p && p.then) p.then(() => a.pause()).catch(() => {});

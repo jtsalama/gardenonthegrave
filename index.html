@@ -353,7 +353,7 @@ if (keys.length > 1) keys.forEach(l => {
   const b = document.createElement('button');
   b.className = 'lang-btn' + (l === lang ? ' active' : '');
   b.textContent = l; b.dataset.l = l;
-  b.onclick = () => langSwitch(l);
+  b.onclick = () => { unlockAll(); langSwitch(l); };  // this tap counts as a gesture too
   $('lr').appendChild(b);
 });
 else $('lr').style.display = 'none';
@@ -563,6 +563,7 @@ function langSwitch(l) {
   // notices and hands it to the recovery path.
   const begin = () => {
     setTimeSafe(a, activeBroadcast ? getTargetTime() : t);
+    a.muted = false;
     if (!w) { $('st').textContent = 'ready'; return; }
     a.play().then(() => {
       on = true;
@@ -585,6 +586,15 @@ function langSwitch(l) {
   else {
     if (w) $('st').textContent = 'loading';
     a.addEventListener('canplay', begin, { once: true });
+    // Firefox fetches nothing for an element it has not been told to play, so waiting for
+    // 'canplay' before calling play() deadlocked: each was waiting for the other, and the
+    // switch simply hung. Start it muted so the fetch begins immediately; begin() sets the
+    // real position and unmutes once there is data.
+    if (w) {
+      a.muted = true;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+    }
   }
 }
 

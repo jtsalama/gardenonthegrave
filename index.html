@@ -345,6 +345,7 @@ let audios = {}, lang = CONFIG.defaultLang, on = false, drag = false;
 let activeBroadcast = null;
 let sourceIndex = {};
 let dead = false, retryTimer = null;   // all sources failed; waiting for a way back
+let waitTimer = null;                  // playback stalled for lack of data
 
 // Lang buttons
 const keys = Object.keys(CONFIG.languages);
@@ -376,6 +377,18 @@ function makeAudio(l, url) {
     if (l !== lang) return;           // a language nobody is listening to must not kill the UI
     if (!tryFallback(l)) giveUp();
   });
+  // 'waiting' is the browser saying outright that playback has stalled for lack of data. This
+  // is what actually catches a dropout in Firefox: it fires no 'error' there, and it keeps
+  // readyState high because the position it is stuck on does have data. If nothing resumes
+  // within ten seconds, hand it to the recovery path.
+  a.addEventListener('waiting', () => {
+    if (a !== audios[l] || l !== lang || !on || dead) return;
+    clearTimeout(waitTimer);
+    waitTimer = setTimeout(() => {
+      if (a === audios[l] && l === lang && on && !dead) giveUp();
+    }, 10000);
+  });
+  a.addEventListener('playing', () => clearTimeout(waitTimer));
   return a;
 }
 
@@ -469,6 +482,10 @@ function unlockAll() {
   unlocked = true;
   Object.values(audios).forEach(a => {
     if (a === c()) return;                   // the active one is about to play for real
+    // Also start fetching. Until now the other language was left at preload 'none', so a
+    // switch began from nothing and the wait looked identical to a broken player. Once the
+    // listener has pressed play they are committed, so a head start is worth the bytes.
+    a.preload = 'auto';
     const p = a.play();
     if (p && p.then) p.then(() => a.pause()).catch(() => {});
   });

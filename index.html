@@ -439,10 +439,15 @@ function switchSource(l, i, forcePos, statusText) {
       $('st').textContent = 'ready';
     }
   }, { once: true });
-  // No nudge here. A freshly built element is created with preload 'auto' and fetches on its
-  // own; telling it to play before it has any data is what left Firefox stuck on "loading"
-  // and then "reconnecting". Recovery worked all along precisely because giveUp() had already
-  // cleared the playing flag, so it skipped this and let the element load by itself.
+  // Ask to play right here, inside the gesture that triggered this. Autoplay rules mean the
+  // play() in the 'canplay' handler above happens too late to be granted — that is why the
+  // switch would load, seek correctly, and then simply refuse to start. Not muted: muting is
+  // what stopped the fetch from progressing on the previous attempt. Nothing is audible yet
+  // because there is no data, and the handler sets the real position the moment there is.
+  if (wasPlaying) {
+    const p = audios[l].play();
+    if (p && p.catch) p.catch(() => {});
+  }
 }
 
 function tryFallback(l) {

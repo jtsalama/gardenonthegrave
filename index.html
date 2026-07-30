@@ -439,13 +439,10 @@ function switchSource(l, i, forcePos, statusText) {
       $('st').textContent = 'ready';
     }
   }, { once: true });
-  // Firefox fetches nothing for an element it has not been told to play, so waiting for
-  // 'canplay' alone would hang here forever. Start it muted; the handler above unmutes.
-  if (wasPlaying) {
-    audios[l].muted = true;
-    const p = audios[l].play();
-    if (p && p.catch) p.catch(() => {});
-  }
+  // No nudge here. A freshly built element is created with preload 'auto' and fetches on its
+  // own; telling it to play before it has any data is what left Firefox stuck on "loading"
+  // and then "reconnecting". Recovery worked all along precisely because giveUp() had already
+  // cleared the playing flag, so it skipped this and let the element load by itself.
 }
 
 function tryFallback(l) {

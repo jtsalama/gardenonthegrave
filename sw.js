@@ -1,4 +1,4 @@
-const CACHE = 'gotg-v23';
+const CACHE = 'gotg-v24';
 
 // This worker only makes the page itself survive a bad connection. It deliberately does NOT
 // touch audio any more: pre-downloading the whole file alongside the stream doubled every

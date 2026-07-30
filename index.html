@@ -346,6 +346,10 @@ let activeBroadcast = null;
 let sourceIndex = {};
 let dead = false, retryTimer = null;   // all sources failed; waiting for a way back
 let waitTimer = null;                  // playback stalled for lack of data
+// Two different things, and conflating them broke recovery: `on` is whether sound is coming
+// out right now, `wantPlay` is whether the listener wants to be listening. An error clears the
+// first but must never clear the second, or the player rebuilds itself and then sits silent.
+let wantPlay = false;
 
 // Lang buttons
 const keys = Object.keys(CONFIG.languages);
@@ -422,7 +426,9 @@ Object.entries(CONFIG.languages).forEach(([l, urls]) => {
 function switchSource(l, i, forcePos, statusText) {
   const urls = CONFIG.languages[l];
   sourceIndex[l] = i;
-  const wasPlaying = on;
+  // Intent, not current state: after an error `on` is false, and reading it here is what left
+  // the rebuilt element paused on "ready" instead of resuming.
+  const wasPlaying = wantPlay;
   const pos = forcePos != null ? forcePos
             : activeBroadcast ? getTargetTime() : audios[l].currentTime;
   audios[l].pause();
@@ -487,7 +493,11 @@ function retry() {
   if (!dead) return;
   // No navigator.onLine check: iOS reports it unreliably, and a refused retry leaves the
   // listener in silence while a failed one costs nothing.
-  switchSource(lang, 0);
+  // Cycle through the sources instead of hammering the primary: if R2 is the thing that is
+  // down, retrying it forever would never reach the GitHub copy that does work.
+  const urls = CONFIG.languages[lang];
+  const n = Array.isArray(urls) ? urls.length : 1;
+  switchSource(lang, (sourceIndex[lang] + 1) % n);
 }
 
 window.addEventListener('online', () => retry());
@@ -526,7 +536,9 @@ function unlockAll() {
 
 $('pb').onclick = () => {
   unlockAll();
-  if (dead) { retry(); return; }
+  // Pressing play in an error state is a request to listen, so record that before retrying —
+  // otherwise the rebuild has no intent to act on and a second press would be needed.
+  if (dead) { wantPlay = true; retry(); return; }
   on ? pa() : pl();
 };
 
@@ -544,6 +556,7 @@ function pl() {
     if (target >= dur()) { $('st').textContent = 'transmission complete'; return; }
     a.currentTime = target;
   }
+  wantPlay = true;
   a.play().then(() => {
     on = true;
     $('pb').classList.add('playing');
@@ -557,6 +570,7 @@ function pl() {
 }
 
 function pa(status = 'paused') {
+  wantPlay = false;              // a deliberate stop, unlike an error
   c().pause(); on = false;
   $('pb').classList.remove('playing');
   $('iP').classList.remove('hidden');
@@ -677,7 +691,9 @@ if ('mediaSession' in navigator) {
   });
   // Wrap the handlers: Media Session calls them with a details object, and pa()'s first
   // parameter is the status text, so passing it straight through corrupts the status line.
-  navigator.mediaSession.setActionHandler('play', () => { dead ? retry() : pl(); });
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (dead) { wantPlay = true; retry(); } else pl();
+  });
   navigator.mediaSession.setActionHandler('pause', () => pa());
   navigator.mediaSession.setActionHandler('stop', () => pa());
 

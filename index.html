@@ -391,10 +391,10 @@ function makeAudio(l, url) {
     }, a.dataset.started ? 10000 : 30000);
   });
   a.addEventListener('playing', () => {
-    // Only a track that has actually been heard counts as started. The silent unlock and the
-    // muted nudge both fire 'playing' too, and letting those count made the stall watch use
-    // its short deadline on a language that was in fact still loading for the first time.
-    if (!a.muted) a.dataset.started = '1';
+    // Only a track that has actually been heard counts as started. The unlock and the muted
+    // nudge both fire 'playing' too, and letting those count made the stall watch use its
+    // short deadline on a language that was in fact still loading for the first time.
+    if (!a.muted && !a.dataset.unlocking) a.dataset.started = '1';
     clearTimeout(waitTimer);
   });
   return a;
@@ -502,11 +502,16 @@ function unlockAll() {
     // use, but it buys more than speed: a switch no longer depends on a download succeeding
     // at the exact moment someone taps the button in the middle of a cemetery.
     a.preload = 'auto';
-    a.muted = true;                          // silent: this must never be audible
+    // Not muted: iOS grants the permission to the element through this very call, and it is
+    // not certain a muted one counts. Nothing is audible anyway — the element has no data yet
+    // and is paused again immediately. The flag keeps this from counting as "has played".
+    a.dataset.unlocking = '1';
     const p = a.play();
+    const done = () => { delete a.dataset.unlocking; };
     // Re-check on resolve: if the listener switched to this language in the meantime, pausing
     // here would stop the playback they just asked for.
-    if (p && p.then) p.then(() => { if (a !== c()) a.pause(); }).catch(() => {});
+    if (p && p.then) p.then(() => { if (a !== c()) a.pause(); done(); }).catch(done);
+    else done();
   });
 }
 

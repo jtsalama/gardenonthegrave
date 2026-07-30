@@ -407,16 +407,20 @@ Object.entries(CONFIG.languages).forEach(([l, urls]) => {
 
 // Rebuild the element for language l on source index i, keeping position and play state.
 // Used both for falling back to the next source and for recovering from a dead state.
-function switchSource(l, i) {
+// Rebuild the element for language l on source index i and resume where we were. Used for
+// falling back to another source, for recovering from a dead state, and for switching
+// language — one path rather than three, since this is the one proven to work in Firefox.
+function switchSource(l, i, forcePos, statusText) {
   const urls = CONFIG.languages[l];
   sourceIndex[l] = i;
   const wasPlaying = on;
-  const pos = activeBroadcast ? getTargetTime() : audios[l].currentTime;
+  const pos = forcePos != null ? forcePos
+            : activeBroadcast ? getTargetTime() : audios[l].currentTime;
   audios[l].pause();
   audios[l].src = '';
   audios[l].load();                                  // release the old element
   audios[l] = makeAudio(l, Array.isArray(urls) ? urls[i] : urls);
-  $('st').textContent = 'reconnecting';
+  $('st').textContent = statusText || 'reconnecting';
   audios[l].addEventListener('canplay', function () {
     if (audios[l] !== this) return;                  // superseded while loading
     revived();
@@ -435,8 +439,8 @@ function switchSource(l, i) {
       $('st').textContent = 'ready';
     }
   }, { once: true });
-  // Same nudge as in langSwitch: Firefox fetches nothing for an element it has not been told
-  // to play, so waiting for 'canplay' alone left recovery stuck on "reconnecting" forever.
+  // Firefox fetches nothing for an element it has not been told to play, so waiting for
+  // 'canplay' alone would hang here forever. Start it muted; the handler above unmutes.
   if (wasPlaying) {
     audios[l].muted = true;
     const p = audios[l].play();
@@ -498,10 +502,8 @@ function unlockAll() {
   unlocked = true;
   Object.values(audios).forEach(a => {
     if (a === c()) return;                   // the active one is about to play for real
-    // Start fetching the other language too. This costs a few MB that most listeners never
-    // use, but it buys more than speed: a switch no longer depends on a download succeeding
-    // at the exact moment someone taps the button in the middle of a cemetery.
-    a.preload = 'auto';
+    // No prefetch here any more: langSwitch rebuilds the element, so anything downloaded now
+    // would be discarded the moment it is needed. This call exists purely for the permission.
     // Not muted: iOS grants the permission to the element through this very call, and it is
     // not certain a muted one counts. Nothing is audible anyway — the element has no data yet
     // and is paused again immediately. The flag keeps this from counting as "has played".
@@ -571,56 +573,14 @@ function setTimeSafe(audio, time) {
 function langSwitch(l) {
   if (l === lang) return;
   const t = activeBroadcast ? getTargetTime() : c().currentTime;
-  const w = on;
-  c().pause(); lang = l;
+  c().pause();
+  lang = l;
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.l === l));
-
-  const a = audios[l];
-  if (a.preload !== 'auto') {
-    a.preload = 'auto';
-    a.load(); // force iOS Safari to fetch metadata even when paused
-  }
-
-  // Seek and start only once the element can actually play. The old code called play()
-  // immediately after load(), on an element that had no data yet. Chrome tolerates that and
-  // waits; Firefox does not, which is why switching to a language that had never been loaded
-  // silently did nothing there. If the data never arrives, the starvation watch in tick()
-  // notices and hands it to the recovery path.
-  const begin = () => {
-    setTimeSafe(a, activeBroadcast ? getTargetTime() : t);
-    a.muted = false;
-    if (!w) { $('st').textContent = 'ready'; return; }
-    a.play().then(() => {
-      on = true;
-      $('pb').classList.add('playing');
-      $('iP').classList.add('hidden');
-      $('iS').classList.remove('hidden');
-      $('sd').classList.add('on');
-      $('st').textContent = activeBroadcast ? 'live' : 'playing';
-    }).catch(() => {
-      on = false;
-      $('pb').classList.remove('playing');
-      $('iP').classList.remove('hidden');
-      $('iS').classList.add('hidden');
-      $('sd').classList.remove('on');
-      $('st').textContent = 'tap to play';
-    });
-  };
-
-  if (a.readyState >= 3) begin();
-  else {
-    if (w) $('st').textContent = 'loading';
-    a.addEventListener('canplay', begin, { once: true });
-    // Firefox fetches nothing for an element it has not been told to play, so waiting for
-    // 'canplay' before calling play() deadlocked: each was waiting for the other, and the
-    // switch simply hung. Start it muted so the fetch begins immediately; begin() sets the
-    // real position and unmutes once there is data.
-    if (w) {
-      a.muted = true;
-      const p = a.play();
-      if (p && p.catch) p.catch(() => {});
-    }
-  }
+  // Rebuild through the same path recovery uses. Three earlier attempts at a lighter switch
+  // all failed in Firefox in a different way each time, because an element that has been
+  // half-loaded, paused, unlocked and nudged is in a state nobody can reason about. Throwing
+  // it away and starting clean costs the buffer and gains a switch that actually works.
+  switchSource(l, sourceIndex[l], t, 'loading');
 }
 
 function fmt(s) {

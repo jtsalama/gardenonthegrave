@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Garden on the Grave — WAUHAUS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=DM+Mono:wght@300;400&display=swap');
+
+  :root {
+    --bg: #0c0c0a;
+    --fg: #c8c2b4;
+    --fg-dim: #5e5a50;
+    --earth: #3a4a28;
+    --earth-light: #6b7d4e;
+    --soil: #2a2118;
+    --bone: #d4c9a8;
+    --serif: 'EB Garamond', Georgia, serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--serif);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .fullscreen {
+    position: fixed;
+    inset: 0;
+  }
+
+  .artwork {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center top;
+    display: block;
+  }
+
+  .artwork::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(to bottom, transparent 40%, rgba(10,10,8,0.5) 55%, rgba(10,10,8,0.88) 75%, rgba(10,10,8,0.95) 100%);
+    pointer-events: none;
+  }
+
+  .controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    padding: 0 1.4rem 3.5rem;
+  }
+
+  .title-block {
+    padding-bottom: 0.8rem;
+  }
+
+  .title-block h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.4rem;
+    letter-spacing: 0.05em;
+    color: var(--fg);
+    text-transform: lowercase;
+  }
+
+  .title-block .credit {
+    font-family: var(--mono);
+    font-weight: 300;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+    margin-top: 0.15rem;
+  }
+
+  .progress-wrap {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    cursor: pointer;
+    border-radius: 1px;
+    position: relative;
+    touch-action: none;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--earth), var(--earth-light));
+    width: 0%;
+    border-radius: 1px;
+    position: relative;
+    transition: width 0.25s linear;
+  }
+
+  .progress-thumb {
+    position: absolute;
+    right: -5px; top: -4px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--bone);
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  }
+
+  .progress-wrap:hover .progress-thumb,
+  .progress-wrap:active .progress-thumb,
+  .progress-wrap.touching .progress-thumb {
+    opacity: 1;
+  }
+
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: rgba(200,194,180,0.5);
+    margin-top: 0.4rem;
+    letter-spacing: 0.04em;
+  }
+
+  .play-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 0 0.2rem;
+  }
+
+  .play-btn {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(200,194,180,0.3);
+    background: rgba(12,12,10,0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    -webkit-appearance: none;
+  }
+
+  .play-btn:active { transform: scale(0.93); }
+
+  .play-btn.playing {
+    border-color: var(--earth-light);
+    box-shadow: 0 0 20px rgba(107,125,78,0.2);
+  }
+
+  .play-btn svg { width: 22px; height: 22px; fill: var(--fg); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--fg-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+    transition: background 0.3s;
+  }
+
+  .status-dot.on { background: var(--earth-light); }
+
+  .lang-row {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .lang-btn {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    background: rgba(12,12,10,0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--fg-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-appearance: none;
+  }
+
+  .lang-btn.active {
+    color: var(--bone);
+    border-color: var(--earth);
+    background: rgba(58,74,40,0.3);
+  }
+
+  .lock-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg);
+  }
+
+  .lock-screen h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.8rem;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+    margin-bottom: 0.8rem;
+  }
+
+  .lock-screen .next {
+    font-family: var(--mono);
+    font-weight: 300;
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    letter-spacing: 0.06em;
+    line-height: 1.7;
+  }
+
+  .lock-screen .next span { color: var(--earth-light); }
+
+  .hidden { display: none !important; }
+
+  /* Read aloud by a screen reader, invisible on screen. Not display:none — that would hide
+     it from the screen reader too, which is the one thing it exists for. */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* The tap highlight is switched off for touch, which also removed the only sign of where
+     the keyboard focus is. Put it back for keyboard users without bringing it back on tap. */
+  .play-btn:focus-visible,
+  .lang-btn:focus-visible {
+    outline: 2px solid var(--bone);
+    outline-offset: 3px;
+  }
+
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .controls { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+
+<div class="fullscreen">
+
+  <!-- Anything written here is spoken by the listener's screen reader. It is left empty
+       almost all of the time on purpose: the speech comes through the same headphones as
+       the performance and interrupts it. See announce() for the three cases. -->
+  <p id="sr" class="sr-only" role="status" aria-live="polite"></p>
+
+  <div class="lock-screen hidden" id="lockScreen">
+    <h1 lang="en">garden on the grave</h1>
+    <p class="next"><span id="nextLabel"></span><br><span id="nextTime"></span></p>
+  </div>
+
+  <!-- alt="" on purpose: the title is already right below as real text, so a description
+       here would only make the screen reader say the same thing twice — in English, on a
+       Latvian page. -->
+  <div class="artwork">
+    <img src="cover.jpg" alt="">
+  </div>
+
+  <div class="controls">
+    <div class="title-block">
+      <!-- lang="en" so a Latvian voice does not try to pronounce the English title by
+           Latvian rules. -->
+      <h1 lang="en">garden on the grave</h1>
+      <div class="credit" lang="en">wauhaus</div>
+    </div>
+
+    <!-- Hidden from screen readers, both of them. The bar is locked during a broadcast
+         anyway, and as an unlabelled element it was never usable by a screen reader — it
+         only added two meaningless stops to swipe past. The times are the same. -->
+    <div class="progress-wrap" id="pw" aria-hidden="true">
+      <div class="progress-fill" id="pf"><div class="progress-thumb"></div></div>
+    </div>
+    <div class="time-row" aria-hidden="true">
+      <span id="tC">0:00</span>
+      <span id="tD">0:00</span>
+    </div>
+
+    <div class="play-row">
+      <button class="play-btn" id="pb" aria-label="Play">
+        <svg id="iP" viewBox="0 0 24 24" aria-hidden="true"><polygon points="7,3 21,12 7,21"/></svg>
+        <svg id="iS" class="hidden" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+      </button>
+
+      <div class="lang-row" id="lr"></div>
+
+      <div class="status">
+        <div class="status-dot" id="sd" aria-hidden="true"></div>
+        <!-- Readable on demand — a listener can go and find out how things stand whenever
+             they want. It just does not speak by itself. -->
+        <span id="st">ready</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// ONE FILE, FOUR ADDRESSES
+//
+//   garden.wauhaus.fi/        both languages, English interface
+//   garden.wauhaus.fi/en/     English only,   English interface
+//   garden.wauhaus.fi/lv/     Latvian only,   Latvian interface
+//   garden.wauhaus.fi/lv-ad/  Latvian with audio description, Latvian interface
+//
+// This file is identical in all four folders. Which one it is comes from the address it
+// was opened at, so there is one source to edit and no chance of them drifting apart.
+// Anyone given a single-language link never sees a language button at all, which is the
+// point: a listener in a cemetery should not have to make a choice they were already
+// asked to make when they got the link. The audio-described version is an address of its
+// own rather than a button for the same reason, only more so.
+// ============================================================
+// The interface is English at every address, including the Latvian ones. Two reasons, and
+// the second is the one that decided it. Play, pause, loading, live and offline are words a
+// Latvian phone user meets every day. And screen reader users in small language communities
+// are more used to English interfaces than sighted users are, because most software is never
+// localised at all — many run their reader in English or Russian, so Latvian text would be
+// read by an English voice and mangled exactly as badly as the reverse.
+// What that buys: one interface, exercised by every test, with no version quietly lagging
+// behind — and no dependency on a translator before the premiere.
+const VARIANTS = {
+  'en':    { track: 'EN',    ui: 'en' },
+  'lv':    { track: 'LV',    ui: 'en' },
+  'lv-ad': { track: 'LV-AD', ui: 'en' },
+};
+
+const VARIANT = (function () {
+  const m = location.pathname.match(/\/([a-z]{2}(?:-[a-z]{2})?)\/?(?:index\.html)?$/i);
+  const v = m ? m[1].toLowerCase() : null;
+  return v && VARIANTS[v] ? v : 'both';   // anything unrecognised falls back to the root
+})();
+
+// ============================================================
+// INTERFACE TEXT
+// Every word the listener can see, in one place. The player writes no English of its
+// own anywhere below — if a string is missing here it will show up as 'undefined',
+// which is deliberate: a silent fallback to English would hide the gap until Riga.
+// ============================================================
+const STRINGS = {
+  en: {
+    ready: 'ready',
+    live: 'live',
+    playing: 'playing',
+    paused: 'paused',
+    loading: 'loading',
+    reconnecting: 'reconnecting',
+    lost: 'connection lost',
+    offline: 'offline',
+    tap: 'tap to play',
+    complete: 'transmission complete',
+    next: 'next broadcast',
+    none: 'no upcoming broadcasts',
+    // The two below are never shown on screen. They are what a screen reader says: the
+    // name of the button, which has to follow what pressing it will do, and the one
+    // sentence spoken when sound returns after a dropout.
+    play: 'Play',
+    pause: 'Pause',
+    resumed: 'sound is back',
+    // Also spoken only. On screen the buttons stay 'EN' and 'LV', which a screen reader
+    // would otherwise spell out letter by letter, with nothing to say that the two belong
+    // together or that the choice is about language at all.
+    langGroup: 'Language',
+    langNames: { 'EN': 'English', 'LV': 'Latvian', 'LV-AD': 'Latvian with audio description' },
+    locale: 'en-GB',
+  },
+  // A second language would be added here as another block, and the address that wants it
+  // switched to it in VARIANTS above. Nothing else would need to change. There was a Latvian
+  // set here; it was dropped, not lost — see the note on VARIANTS for why.
+};
+
+const UI = VARIANT === 'both' ? 'en' : VARIANTS[VARIANT].ui;
+const T = STRINGS[UI];
+document.documentElement.lang = UI;
+document.getElementById('pb').setAttribute('aria-label', T.play);
+document.getElementById('st').textContent = T.ready;
+document.getElementById('nextLabel').textContent = T.next;
+
+// ============================================================
+// CONFIG — TEMPORARY TEST SETUP, revert before the show
+// Both tracks are still the same Copenhagen master, so the language buttons currently
+// switch between two encodings of one recording rather than between two languages.
+// That is enough to test the machinery: the switch, the position carry-over and the
+// recovery path do not care what is being said.
+// ============================================================
+// Primary is wauhausmedia.com, the bucket's own domain. The old pub-….r2.dev address still
+// works but is rate-limited and meant for development only, so under fifty phones at once it
+// is the thing most likely to be throttled — and it would be throttled for everyone at the
+// same second. The custom domain also puts Cloudflare's cache in front of the bucket, which
+// matters most for a latecomer: jumping to the middle of the file is served from the edge.
+// Second entry in each list is GitHub, untouched, for when the first one fails.
+// The real Riga recordings, encoded 17 August 2026 from the 48 kHz 24-bit masters.
+// AAC-LC 160k, faststart verified, and both languages measured at exactly 4060.000 s so a
+// listener switching language mid-piece lands on the same moment.
+const TRACKS = {
+  'EN': [
+    'https://wauhausmedia.com/riga-v1-en.m4a',
+    'https://github.com/jtsalama/gardenonthegrave/releases/download/v3/riga-v1-en.m4a',
+  ],
+  'LV': [
+    'https://wauhausmedia.com/riga-v1-lv.m4a',
+    'https://github.com/jtsalama/gardenonthegrave/releases/download/v3/riga-v1-lv.m4a',
+  ],
+  // Latvian with audio description. Still the plain Latvian track as a placeholder, which is a
+  // better stand-in than the old Copenhagen file: right language, right length, right cues.
+  // Replace with riga-v1-lv-ad.m4a when it exists. That is a separate performance where
+  // everyone hears this one version, so its internal timing need not match anything else —
+  // but its total length must stay 4060 s or the broadcast window will close at the wrong
+  // moment for it.
+  'LV-AD': [
+    'https://wauhausmedia.com/riga-v1-lv.m4a',
+    'https://github.com/jtsalama/gardenonthegrave/releases/download/v3/riga-v1-lv.m4a',
+  ],
+  // Every new export gets a new filename. Never reuse one: the old name may still be sitting
+  // in somebody's browser cache, and they would hear last week's edit.
+};
+
+// What the bilingual root offers. The audio-described track is deliberately not here: it
+// belongs to its own address and its own performance, and putting it behind a button would
+// mean a blind listener had to find that button.
+const BILINGUAL = ['EN', 'LV'];
+
+const CONFIG = {
+  languages: Object.fromEntries(BILINGUAL.map(k => [k, TRACKS[k]])),
+  defaultLang: 'EN',
+
+  // Scheduled sync. With a window listed here, everyone who opens the page hears the same
+  // moment of the piece, and outside the window the lock screen blocks playback entirely.
+  // null means on-demand listening, which is what this is set to for testing the three
+  // addresses. Put the real Riga dates here, in +03:00, before the show.
+  // Scheduled broadcast mode is now permanent. Every listener who opens the page hears the
+  // same moment of the piece, whenever they press play, and someone arriving late joins where
+  // the group already is. Outside a window the lock screen shows and playback is blocked.
+  // Do NOT set this back to null: on-demand listening does not correspond to any real
+  // situation, and a free-running player in a cemetery means everyone hears something
+  // different. Between windows the page reading "no upcoming broadcasts" is correct behaviour,
+  // not a fault.
+  //
+  // Each window runs from its start for durationFallback seconds, so keep that value honest
+  // once the real audio arrives or the window will close at the wrong moment.
+  //
+  // Past windows simply never open again, so old entries can be left in place. The real Riga
+  // dates go here, in +03:00.
+  broadcasts: [
+    { start: '2026-08-11T10:15:00+03:00' },   // iPhone test 1, Henriks, Riga
+    { start: '2026-08-11T12:30:00+03:00' },   // iPhone test 2, retesting recovery after the
+                                             // duration fix. Window 12:30:00 to 13:33:32.
+  ],
+
+  // Total length of the piece in seconds. THE SINGLE MOST DANGEROUS NUMBER IN THIS FILE.
+  //
+  // It is the only thing that decides when a broadcast window closes, deliberately so: reading
+  // the length off the media element instead ended a performance 22 minutes early on an iPhone
+  // in Riga, because a stalled element reports only what it has buffered. If this number is
+  // too small the whole audience drops out on the same second, not one by one.
+  //
+  // Measured, not estimated: both Riga masters are exactly 4060.000 s (67:40) and the encoded
+  // files came out at 4060.000 s as well. Anything that replaces them must match, including
+  // the audio-described version. The loadedmetadata check below warns in the console if the
+  // real file disagrees by more than two seconds — but nobody reads a console in a cemetery,
+  // so treat this line as something to update by hand every single time the audio changes.
+  durationFallback: 4060,
+};
+
+// A single-language address gets exactly one track and no language button. The
+// bilingual root keeps both.
+if (VARIANT !== 'both') {
+  const only = VARIANTS[VARIANT].track;
+  CONFIG.languages = { [only]: TRACKS[only] };
+  CONFIG.defaultLang = only;
+}
+
+// ============================================================
+const $ = id => document.getElementById(id);
+let audios = {}, lang = CONFIG.defaultLang, on = false, drag = false;
+let activeBroadcast = null;
+let sourceIndex = {};
+let dead = false, retryTimer = null;   // all sources failed; waiting for a way back
+let waitTimer = null;                  // playback stalled for lack of data
+// Two different things, and conflating them broke recovery: `on` is whether sound is coming
+// out right now, `wantPlay` is whether the listener wants to be listening. An error clears the
+// first but must never clear the second, or the player rebuilds itself and then sits silent.
+let wantPlay = false;
+
+// ============================================================
+// WHAT A BLIND LISTENER HEARS
+//
+// A screen reader speaks into the same headphones the performance is playing through, and
+// it interrupts the performance to do it. So the rule is not "announce everything", it is
+// the opposite: say nothing unless the listener is otherwise stranded.
+//
+// The phone speaks in exactly these cases:
+//   1. Before any sound has been heard. Nothing is playing, so nothing can be interrupted,
+//      and this is when the listener needs to know whether the thing started at all.
+//   2. When the connection is lost. The audio has already stopped, so again nothing is
+//      interrupted — and without this, a dropout is indistinguishable from a silence that
+//      belongs to the piece. Someone would stand still in a cemetery waiting for a sound
+//      that is never coming.
+//   3. When sound returns after a loss, and when the piece reaches its end. Both are
+//      moments where silence would otherwise mean nothing at all.
+//
+// Everything else — started, paused, buffering, switching source — stays silent. The
+// listener can hear whether there is sound. They do not need to be told.
+// ============================================================
+let everPlayed = false;   // any real playback has begun; the piece is under way
+let lostSpoken = false;   // a dropout was announced, so its resolution has to be too
+
+function announce(text) {
+  const el = $('sr');
+  // Clearing first and setting on a delay: a live region that is given the text it already
+  // holds may say nothing at all, and two identical dropouts in a row would go unspoken.
+  el.textContent = '';
+  setTimeout(() => { el.textContent = text; }, 60);
+}
+
+// The one place the status line is written. `speak` forces the announcement for the cases
+// above; otherwise it is spoken only while nothing has started yet.
+function setStatus(text, speak) {
+  $('st').textContent = text;
+  if (speak || !everPlayed) announce(text);
+}
+
+// The button's name has to describe what pressing it will do, or a blind listener is told
+// "play" while the piece is already playing and cannot tell what the press would achieve.
+function playLabel(isPlaying) {
+  $('pb').setAttribute('aria-label', isPlaying ? T.pause : T.play);
+}
+
+// Lang buttons
+const keys = Object.keys(CONFIG.languages);
+if (keys.length > 1) {
+  // Tie the buttons together as one named choice. Without this a screen reader announces two
+  // unrelated buttons and never says what they are for.
+  $('lr').setAttribute('role', 'group');
+  $('lr').setAttribute('aria-label', T.langGroup);
+}
+if (keys.length > 1) keys.forEach(l => {
+  const b = document.createElement('button');
+  b.className = 'lang-btn' + (l === lang ? ' active' : '');
+  b.textContent = l; b.dataset.l = l;
+  // Seen: 'EN'. Spoken: 'English'. Two letters read aloud are letters, not a language.
+  b.setAttribute('aria-label', (T.langNames && T.langNames[l]) || l);
+  // The highlight says which language is on. aria-pressed says the same thing out loud.
+  b.setAttribute('aria-pressed', l === lang ? 'true' : 'false');
+  b.onclick = () => { unlockAll(); langSwitch(l); };  // this tap counts as a gesture too
+  $('lr').appendChild(b);
+});
+else $('lr').style.display = 'none';
+
+// FIX #6: set preload correctly from the start, not overridden after
+function makeAudio(l, url) {
+  const a = new Audio();
+  a.preload = (l === lang) ? 'auto' : 'none';
+  a.disableRemotePlayback = true; // no Cast button, no nearby-devices/Bluetooth scan prompt
+  a.src = url;
+  a.addEventListener('loadedmetadata', () => {
+    if (Math.abs(a.duration - CONFIG.durationFallback) > 2) {
+      console.warn('Duration mismatch: audio is ' + Math.round(a.duration) + 's, durationFallback is ' + CONFIG.durationFallback + 's — update CONFIG.');
+    }
+  });
+  a.addEventListener('ended', () => {
+    // Spoken: after the last sound, silence is the only thing left, and it needs to mean
+    // something other than a fault.
+    pa(T.complete, true); $('pf').style.width = '100%';
+  });
+  a.addEventListener('error', () => {
+    if (a !== audios[l]) return;      // stale element from an earlier source, ignore
+    if (l !== lang) return;           // a language nobody is listening to must not kill the UI
+    if (!tryFallback(l)) giveUp();
+  });
+  // 'waiting' is the browser saying outright that playback has stalled for lack of data. This
+  // is what actually catches a dropout in Firefox: it fires no 'error' there, and it keeps
+  // readyState high because the position it is stuck on does have data. If nothing resumes
+  // within ten seconds, hand it to the recovery path.
+  a.addEventListener('waiting', () => {
+    if (a !== audios[l] || l !== lang || !on || dead) return;
+    clearTimeout(waitTimer);
+    // An element that has never played is simply still loading, and Firefox is slow at it.
+    // Only give up quickly on something that was already running and then stopped.
+    waitTimer = setTimeout(() => {
+      if (a === audios[l] && l === lang && on && !dead) giveUp();
+    }, a.dataset.started ? 10000 : 30000);
+  });
+  a.addEventListener('playing', () => {
+    clearTimeout(waitTimer);
+    // The unlock also fires this, and it must not count as the track having been heard.
+    if (a.muted || a.dataset.unlocking) return;
+    a.dataset.started = '1';
+    // Let the interface follow what is actually happening rather than what we asked for.
+    // Whoever started this element — the gesture, a retry, the lock screen — the state is
+    // the same once sound is coming out, and this is the only moment we know that for sure.
+    if (a !== audios[lang]) return;
+    on = true;
+    // Set before the status is written, so that "playing" is never spoken aloud: from here
+    // on the piece is audible and can say for itself that it is running.
+    everPlayed = true;
+    $('pb').classList.add('playing');
+    $('iP').classList.add('hidden');
+    $('iS').classList.remove('hidden');
+    $('sd').classList.add('on');
+    playLabel(true);
+    setStatus(activeBroadcast ? T.live : T.playing);
+    // The exception: sound coming back after a dropout that was announced. The listener was
+    // told the connection was lost and would otherwise never be told it was found.
+    if (lostSpoken) { lostSpoken = false; announce(T.resumed); }
+    // Sound is out, so whatever was blocking is over. Start the counters clean for the next
+    // outage, otherwise a listener who recovered once would be told to tap immediately the
+    // second time.
+    failedRounds = 0;
+    tapSpoken = false;
+  });
+  return a;
+}
+
+Object.entries(CONFIG.languages).forEach(([l, urls]) => {
+  sourceIndex[l] = 0;
+  audios[l] = makeAudio(l, Array.isArray(urls) ? urls[0] : urls);
+});
+
+// Point language l at source index i and resume where we were. Used for falling back to
+// another source, for recovering from a dead state, and for switching language.
+//
+// `reuse` decides whether the existing media element is kept or thrown away, and getting this
+// wrong cost us an entire iPhone test round.
+//
+// Building a fresh element is the right thing inside a user gesture: an element that has been
+// half-loaded, paused, unlocked and nudged is in a state nobody can reason about, and three
+// attempts at a lighter language switch each failed in Firefox in a different way. A new
+// element created during a tap inherits that tap's permission, so it works.
+//
+// Automatic recovery is the opposite case. iOS grants permission to play PER ELEMENT and only
+// through a user gesture. An element created by a timer has never been touched by one, so it
+// can neither load data nor start. Rebuilding on every retry therefore produced a new
+// stillborn element every few seconds, forever: on an iPhone in Riga the player cycled
+// "connection lost" and "reconnecting" indefinitely while a single tap fixed it instantly.
+// That tap was the tell. A network fault would not care who asked.
+// So on recovery we keep the element that already has permission and only change its source.
+function switchSource(l, i, forcePos, statusText, reuse) {
+  const urls = CONFIG.languages[l];
+  sourceIndex[l] = i;
+  // Intent, not current state: after an error `on` is false, and reading it here is what left
+  // the rebuilt element paused on "ready" instead of resuming.
+  const wasPlaying = wantPlay;
+  const pos = forcePos != null ? forcePos
+            : activeBroadcast ? getTargetTime() : audios[l].currentTime;
+  const url = Array.isArray(urls) ? urls[i] : urls;
+
+  if (reuse) {
+    const a = audios[l];
+    a.pause();
+    a.src = url;
+    a.load();
+    // It has to earn "has played" again, or the stall detector will judge a fresh load by the
+    // ten second rule meant for playback that was already running.
+    delete a.dataset.started;
+  } else {
+    audios[l].pause();
+    audios[l].src = '';
+    audios[l].load();                                // release the old element
+    audios[l] = makeAudio(l, url);
+  }
+  setStatus(statusText || T.reconnecting);
+  // When the element is reused, the "superseded" guard below cannot help: every retry is the
+  // same object, so a listener left over from an attempt that never loaded would still be
+  // sitting there and could fire later against a stale position. Drop the previous one first.
+  if (audios[l]._onCanplay) {
+    audios[l].removeEventListener('canplay', audios[l]._onCanplay);
+  }
+  audios[l]._onCanplay = function () {
+    this._onCanplay = null;
+    if (audios[l] !== this) return;                  // superseded while loading
+    revived();
+    setTimeSafe(this, activeBroadcast ? getTargetTime() : pos);
+    this.muted = false;
+    if (!wasPlaying) { setStatus(T.ready); return; }
+    // Only ask again if the request made inside the gesture did not take. Asking twice on the
+    // same element makes the two calls abort each other, which is why the switch worked or
+    // hung depending on how fast the file arrived. The 'playing' handler updates the interface.
+    if (this.paused) {
+      // Spoken whatever the state: a refused start leaves the listener with silence and no
+      // way to know a second press is needed.
+      const p = this.play();
+      if (p && p.catch) p.catch(() => { needsTap(); });
+    }
+  };
+  audios[l].addEventListener('canplay', audios[l]._onCanplay, { once: true });
+  // Ask to play right here, inside the gesture that triggered this. Autoplay rules mean the
+  // play() in the 'canplay' handler above happens too late to be granted — that is why the
+  // switch would load, seek correctly, and then simply refuse to start. Not muted: muting is
+  // what stopped the fetch from progressing on the previous attempt. Nothing is audible yet
+  // because there is no data, and the handler sets the real position the moment there is.
+  if (wasPlaying) {
+    const p = audios[l].play();
+    if (p && p.catch) p.catch(() => {});
+  }
+}
+
+function tryFallback(l) {
+  const urls = CONFIG.languages[l];
+  if (!Array.isArray(urls)) return false;
+  const next = sourceIndex[l] + 1;
+  if (next >= urls.length) return false;
+  switchSource(l, next, null, null, true);   // reuse: this runs from an error, not from a tap
+  return true;
+}
+
+// Automatic recovery has done all it can and the browser is still refusing to start. On iOS
+// that refusal is permanent until the listener touches the screen, so the honest thing is to
+// stop saying "reconnecting" and say what will actually work. Retries continue underneath in
+// case the cause was the network after all.
+let tapSpoken = false;
+let failedRounds = 0;   // consecutive automatic attempts that led nowhere
+function needsTap() {
+  setStatus(T.tap, !tapSpoken);
+  tapSpoken = true;
+}
+
+// Every source failed. Without this the player used to stay dead until a manual reload,
+// which in a cemetery means the listener is out of the performance for good.
+function giveUp() {
+  dead = true;
+  on = false;
+  $('pb').classList.remove('playing');
+  $('iP').classList.remove('hidden');
+  $('iS').classList.add('hidden');
+  $('sd').classList.remove('on');
+  playLabel(false);
+  // Spoken once per outage, not once per attempt. giveUp() runs again on every failed retry,
+  // so without this guard a listener would hear "connection lost" every few seconds for as
+  // long as the network stayed down — the exact noise the speech rule exists to prevent. The
+  // status line still updates each time; only the speaking is suppressed. lostSpoken is
+  // cleared when sound returns, so a later, separate outage is announced again.
+  // After several rounds have got nowhere, stop repeating a diagnosis the listener can do
+  // nothing with and give them the one instruction that always works. On iOS this is not a
+  // hint, it is the only way back: the browser will not start playback again until the screen
+  // is touched, however long we keep trying.
+  failedRounds++;
+  if (failedRounds >= 3) needsTap();
+  else { setStatus(navigator.onLine ? T.lost : T.offline, !lostSpoken); lostSpoken = true; }
+  if (!retryTimer) scheduleRetry();
+}
+
+// Retries are spread out on purpose rather than fired on a fixed interval.
+//
+// There is exactly one moment in this whole system where fifty phones would do the same thing
+// at the same second, and it is the worst one: the network fails for the group, then comes
+// back. Every player would then be told 'online' simultaneously and, on a fixed timer, would
+// also fall into step with each other — all reconnecting at once onto a network that has only
+// just recovered and is probably still congested. If that attempt fails they retry together
+// five seconds later, and again, and the group stays silent longer than the outage itself.
+//
+// A random delay per phone breaks the lockstep. For one listener it is a difference of a
+// second or two and invisible; across a group it turns one surge into a queue the cell can
+// actually serve. Note this is about the cell tower, not our origin: in broadcast mode
+// everyone seeks to the same position and therefore asks for the same bytes, so the first
+// request warms Cloudflare's edge and the rest are cache hits.
+function scheduleRetry() {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (!dead) { retryTimer = null; return; }
+    retry();
+    scheduleRetry();          // keep trying, with a fresh random delay each round
+  }, 3000 + Math.random() * 4000);
+}
+
+function revived() {
+  dead = false;
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+}
+
+// Start over from the primary source. Called on a timer, on 'online', and from the play button.
+// `fromTap` says whether a finger is behind this. It decides whether the element may be thrown
+// away and rebuilt, which only a real gesture makes safe on iOS.
+function retry(fromTap) {
+  if (!dead) return;
+  // No navigator.onLine check: iOS reports it unreliably, and a refused retry leaves the
+  // listener in silence while a failed one costs nothing.
+  // Cycle through the sources instead of hammering the primary: if R2 is the thing that is
+  // down, retrying it forever would never reach the GitHub copy that does work.
+  const urls = CONFIG.languages[lang];
+  const n = Array.isArray(urls) ? urls.length : 1;
+  switchSource(lang, (sourceIndex[lang] + 1) % n, null, null, !fromTap);
+}
+
+// The one event guaranteed to reach every phone in the same instant, so it is also the one
+// most in need of spreading out. A wait of up to two seconds is nothing to a single listener
+// who has been silent for longer than that already.
+window.addEventListener('online', () => {
+  if (!dead) return;
+  setTimeout(() => { if (dead) retry(); }, Math.random() * 2000);
+});
+
+const c = () => audios[lang];
+
+// THE AUTHORITATIVE LENGTH OF THE PIECE. A configured constant, and nothing else.
+//
+// This must never come from the media element. On an iPhone in Riga, playback stopped dead
+// 22 minutes before the broadcast window was due to close, the lock screen reappeared, and
+// the player would not resume even once the network came back. The chain: offline, the buffer
+// ran out, the element reported a duration equal to what it had buffered rather than the
+// length of the file, chk() computed the window as start + that shorter number, decided the
+// broadcast was over, and called pa() — which clears wantPlay, the one flag automatic
+// recovery depends on. From there the listener was out of the performance for good.
+// The window end and the shared position are both derived from this, so a number that can
+// shrink underneath us cannot be allowed anywhere near them.
+const pieceLength = () => CONFIG.durationFallback;
+
+// The element's own idea of its length, used ONLY to draw the progress bar and the total time.
+// Wrong here is cosmetic. Wrong in pieceLength() ends the performance.
+const dur = () =>
+  isFinite(c().duration) && c().duration > 0
+    ? c().duration
+    : CONFIG.durationFallback;
+
+// iOS only lets an element play if the call comes straight out of a user gesture. Everything
+// that starts playback later — switching language once loaded, recovering when the network
+// returns — would be refused there. So on the very first tap, give every language a token
+// play/pause inside the gesture. After that the browser considers them unlocked and later
+// programmatic starts are allowed.
+let unlocked = false;
+function unlockAll() {
+  if (unlocked) return;
+  unlocked = true;
+  Object.values(audios).forEach(a => {
+    if (a === c()) return;                   // the active one is about to play for real
+    // No prefetch here any more: langSwitch rebuilds the element, so anything downloaded now
+    // would be discarded the moment it is needed. This call exists purely for the permission.
+    // Not muted: iOS grants the permission to the element through this very call, and it is
+    // not certain a muted one counts. Nothing is audible anyway — the element has no data yet
+    // and is paused again immediately. The flag keeps this from counting as "has played".
+    a.dataset.unlocking = '1';
+    const p = a.play();
+    const done = () => { delete a.dataset.unlocking; };
+    // Re-check on resolve: if the listener switched to this language in the meantime, pausing
+    // here would stop the playback they just asked for.
+    if (p && p.then) p.then(() => { if (a !== c()) a.pause(); done(); }).catch(done);
+    else done();
+  });
+}
+
+$('pb').onclick = () => {
+  unlockAll();
+  // Pressing play in an error state is a request to listen, so record that before retrying —
+  // otherwise the rebuild has no intent to act on and a second press would be needed.
+  // A finger is on the screen, so a full rebuild is safe here and is the strongest reset we
+  // have. This is the listener's way back when everything automatic has failed.
+  if (dead) { wantPlay = true; retry(true); return; }
+  on ? pa() : pl();
+};
+
+function getTargetTime() {
+  if (!activeBroadcast) return 0;
+  const elapsed = (Date.now() - activeBroadcast.start.getTime()) / 1000;
+  // pieceLength(), not dur(): where the group is must not depend on how much this particular
+  // phone has managed to download.
+  return Math.max(0, Math.min(elapsed, pieceLength()));
+}
+
+function pl() {
+  const a = c();
+  a.muted = false;   // an unlock or a nudge may have left it silent
+  if (activeBroadcast) {
+    const target = getTargetTime();
+    if (target >= pieceLength()) { setStatus(T.complete, true); return; }
+    a.currentTime = target;
+  }
+  wantPlay = true;
+  a.play().then(() => {
+    on = true;
+    everPlayed = true;
+    $('pb').classList.add('playing');
+    $('iP').classList.add('hidden');
+    $('iS').classList.remove('hidden');
+    $('sd').classList.add('on');
+    playLabel(true);
+    setStatus(activeBroadcast ? T.live : T.playing);
+  }).catch(() => {
+    setStatus(T.tap, true);
+  });
+}
+
+function pa(status, speak) {
+  wantPlay = false;              // a deliberate stop, unlike an error
+  c().pause(); on = false;
+  $('pb').classList.remove('playing');
+  $('iP').classList.remove('hidden');
+  $('iS').classList.add('hidden');
+  $('sd').classList.remove('on');
+  playLabel(false);
+  // Silent by default: a listener who paused the piece heard it stop.
+  setStatus(status || T.paused, speak);
+}
+
+// FIX A: safe currentTime assignment — waits for metadata if not yet loaded
+function setTimeSafe(audio, time) {
+  if (audio.readyState >= 1) {
+    audio.currentTime = time;
+  } else {
+    audio.addEventListener('loadedmetadata', function handler() {
+      audio.removeEventListener('loadedmetadata', handler);
+      audio.currentTime = time;
+    }, { once: true });
+  }
+}
+
+function langSwitch(l) {
+  if (l === lang) return;
+  const t = activeBroadcast ? getTargetTime() : c().currentTime;
+  c().pause();
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.l === l);
+    b.setAttribute('aria-pressed', b.dataset.l === l ? 'true' : 'false');
+  });
+  // Rebuild through the same path recovery uses. Three earlier attempts at a lighter switch
+  // all failed in Firefox in a different way each time, because an element that has been
+  // half-loaded, paused, unlocked and nudged is in a state nobody can reason about. Throwing
+  // it away and starting clean costs the buffer and gains a switch that actually works.
+  switchSource(l, sourceIndex[l], t, T.loading);
+}
+
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = Math.floor(s%60);
+  return h > 0 ? h+':'+String(m).padStart(2,'0')+':'+String(sc).padStart(2,'0') : m+':'+String(sc).padStart(2,'0');
+}
+
+let lastSync = 0;
+let ticking = false;
+function tick() {
+  if (ticking) return;
+  ticking = true;
+  const loop = () => {
+    const a = c(), d = dur();
+    if (!document.hidden && d > 0 && !drag) {
+      $('pf').style.width = (a.currentTime / d * 100) + '%';
+      $('tC').textContent = fmt(a.currentTime);
+      $('tD').textContent = fmt(d);
+    }
+    // (Stall detection lives on the 'waiting' event in makeAudio. A readyState watch used to
+    // sit here as well, but it could not tell a first load from a dropout and declared the
+    // connection lost while a language was still perfectly normally loading.)
+    if (on && activeBroadcast && Date.now() - lastSync > 15000) {
+      const target = getTargetTime();
+      if (Math.abs(a.currentTime - target) > 1.5) a.currentTime = target;
+      lastSync = Date.now();
+    }
+    if (document.hidden) {
+      setTimeout(loop, 1000);
+    } else {
+      requestAnimationFrame(loop);
+    }
+  };
+  loop();
+}
+tick();
+
+function sk(e) {
+  if (activeBroadcast) return;
+  const r = $('pw').getBoundingClientRect();
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const p = Math.max(0, Math.min(1, (x-r.left)/r.width));
+  const a = c();
+  if (a.duration) {
+    a.currentTime = p * a.duration;
+    Object.values(audios).forEach(el => { if (el !== a && el.readyState >= 1) el.currentTime = a.currentTime; }); // FIX B: skip unloaded audio elements
+    $('pf').style.width = (p*100)+'%';
+  }
+}
+
+$('pw').addEventListener('mousedown', e => { if (!activeBroadcast) drag=true; sk(e); }); // FIX C: don't set drag in broadcast mode
+$('pw').addEventListener('touchstart', e => { if (!activeBroadcast) { drag=true; $('pw').classList.add('touching'); } sk(e); }, {passive:true});
+document.addEventListener('mousemove', e => { if(drag) sk(e); });
+document.addEventListener('touchmove', e => { if(drag) sk(e); }, {passive:true});
+document.addEventListener('mouseup', () => { drag=false; });
+document.addEventListener('touchend', () => { drag=false; $('pw').classList.remove('touching'); });
+document.addEventListener('touchcancel', () => { drag=false; $('pw').classList.remove('touching'); });
+
+function chk() {
+  if (!CONFIG.broadcasts) { $('lockScreen').classList.add('hidden'); activeBroadcast = null; return; }
+  // pieceLength(), not dur(). This decides whether the performance is still running, and it
+  // must give the same answer on every phone regardless of what any of them has buffered.
+  const now = new Date(), d = pieceLength();
+  let found = null;
+  for (const b of CONFIG.broadcasts) {
+    const s = new Date(b.start), e = new Date(s.getTime() + d * 1000);
+    if (now >= s && now <= e) { found = { start: s, end: e }; break; }
+  }
+  if (found) { activeBroadcast = found; $('lockScreen').classList.add('hidden'); }
+  else {
+    activeBroadcast = null; $('lockScreen').classList.remove('hidden');
+    if (on) pa();
+    const future = CONFIG.broadcasts.map(b => new Date(b.start)).filter(s => s > now).sort((a,b) => a-b);
+    $('nextTime').textContent = future.length
+      ? future[0].toLocaleDateString(T.locale, { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' })
+      : T.none;
+  }
+}
+if (CONFIG.broadcasts) {
+  chk();
+  setInterval(chk, 5000);
+}
+
+if ('mediaSession' in navigator) {
+  // Small, square, and honestly declared. This used to point at cover.jpg while claiming it was
+  // 512x512; cover.jpg is 3517x4741 and 4.3 MB. The operating system fetches this image to draw
+  // the lock screen player, and on an iPhone in Riga that panel kept failing to appear — and
+  // once it failed, playback also stopped when the screen was locked, because iOS suspends a
+  // tab it has not registered as playing media. The panel came back by itself after the image
+  // had been cached, and vanished again the moment the tester cleared his cache, which is what
+  // pointed here. 36 KB instead of 4.3 MB, and the dimensions are now the truth.
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: 'Garden on the Grave', artist: 'WAUHAUS', album: 'Garden on the Grave',
+    // One size only. The convention is to offer several and let the system pick, but the lock
+    // screen draws this large, so 512 is the one that gets used and anything smaller is a file
+    // to keep in sync for nothing.
+    artwork: [{ src: 'artwork-512.jpg', sizes: '512x512', type: 'image/jpeg' }]
+  });
+  // Wrap the handlers: Media Session calls them with a details object, and pa()'s first
+  // parameter is the status text, so passing it straight through corrupts the status line.
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (dead) { wantPlay = true; retry(); } else pl();
+  });
+  navigator.mediaSession.setActionHandler('pause', () => pa());
+  navigator.mediaSession.setActionHandler('stop', () => pa());
+
+  // Claim the seek actions too. Without handlers the OS scrubs the element directly, which
+  // let the lock screen skip past the broadcast lock that the in-page bar refuses.
+  const snapBack = () => {
+    const t = getTargetTime();
+    if (Math.abs(c().currentTime - t) > 1.5) c().currentTime = t;
+  };
+  const seekHandlers = {
+    seekto: d => { if (activeBroadcast) return snapBack();
+                   if (d && d.seekTime != null) c().currentTime = d.seekTime; },
+    seekbackward: d => { if (activeBroadcast) return snapBack();
+                         c().currentTime = Math.max(0, c().currentTime - ((d && d.seekOffset) || 10)); },
+    seekforward: d => { if (activeBroadcast) return snapBack();
+                        c().currentTime = Math.min(dur(), c().currentTime + ((d && d.seekOffset) || 10)); },
+    previoustrack: () => { if (activeBroadcast) return snapBack(); c().currentTime = 0; },
+    nexttrack: () => { if (activeBroadcast) return snapBack(); },
+  };
+  Object.entries(seekHandlers).forEach(([action, fn]) => {
+    try { navigator.mediaSession.setActionHandler(action, fn); } catch (e) {}
+  });
+}
+
+// FIX #2: relative path works outside root too — and here it matters for real. Registering
+// './sw.js' from /en/ gives that worker the scope /en/, so the three addresses get three
+// independent workers and never fight over one another's cached page.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// No audio pre-caching. Downloading the whole file alongside the stream doubled every
+// listener's data, competed with the stream on exactly the weak connections it was meant to
+// protect, and only ever completed on a connection good enough not to need it. The media
+// element's own buffer plus automatic recovery covers real dropouts instead.
+
+// Resync to broadcast time when screen wakes up — covers any drift
+// accumulated while JS was throttled in the background.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && on && activeBroadcast) {
+    const target = getTargetTime();
+    if (Math.abs(c().currentTime - target) > 1.5) c().currentTime = target;
+    lastSync = Date.now();
+  }
+});
+</script>
+</body>
+</html>
